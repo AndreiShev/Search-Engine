@@ -1,0 +1,41 @@
+tprov:
+  profile: DEFAULT
+  description: DEFAULT profile active
+
+server:
+  port: 8080
+
+spring:
+  profiles:
+    active: DEFAULT
+  datasource:
+    username: root
+    password: testtest
+    url: jdbc:mysql://localhost:3306/search_engine?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+  messages:
+    basename: lang.messages
+
+indexing-settings:
+  sites:
+    - url: https://skillbox.ru
+      name: Skillbox
+
+    - url: https://life.ru
+      name: Life.ru
+
+    - url: https://ipfran.ru
+      name: ИПФ РАН
+
+    - url: https://dombulgakova.ru
+      name: Булгаковский дом
+
+    - url: http://www.playback.ru
+      name: Playback.ru
+webinterface: /admin
