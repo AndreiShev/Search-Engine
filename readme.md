@@ -17,17 +17,17 @@ The project includes 3 services:
 
 After launching the project, you need to click on the link in the browser `http://localhost:8080 /`. After that, the project dashboard opens, displaying statistics of indexed sites.
 <br/>
-![dashboard](https://gitlab.skillbox.ru/andrei_sheveliov/java_basics/-/blob/master/SearchEngine/src/main/resources/static/assets/img/readme/dashboard.png)
+![dashboard](src/main/resources/static/assets/img/readme/dashboard.gif)
 <br/>
 
 On the management tab, you can start indexing all sites or a separate page.
 <br/>
-![management](https://gitlab.skillbox.ru/andrei_sheveliov/java_basics/-/blob/master/SearchEngine/src/main/resources/static/assets/img/readme/management.png)
+![management](src/main/resources/static/assets/img/readme/management.gif)
 <br/>
 
 On the search tab, you can find pages containing interesting words or phrases.
 <br/>
-![search](https://gitlab.skillbox.ru/andrei_sheveliov/java_basics/-/blob/master/SearchEngine/src/main/resources/static/assets/img/readme/search.png)
+![search](src/main/resources/static/assets/img/readme/search.gif)
 <br/>
 
 ## Technologies
