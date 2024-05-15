@@ -1,8 +1,12 @@
 package searchengine.parser;
 
+import lombok.Data;
 import lombok.Getter;
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
+import org.springframework.beans.factory.annotation.Autowired;
 import searchengine.model.Site;
+import searchengine.parserData.SiteIndexingData;
 import searchengine.utils.IndexingUtils;
 
 import java.io.IOException;
@@ -10,14 +14,15 @@ import java.util.*;
 import java.util.stream.Collectors;
 import static searchengine.parser.ParserWrapper.*;
 
-@Setter
-@Getter
+@Data
+@RequiredArgsConstructor
 public class PageLoader extends Thread {
     private ParserWrapper parserWrapper;
     private Site site;
     private Set<String> linkSet = new HashSet<>();
     private final int limitPage = 200;
     private final int optimalQuantity = 50;
+    private SiteIndexingData siteIndexingData;
 
     public PageLoader(ParserWrapper parserWrapper, Site site) {
         this.parserWrapper = parserWrapper;
@@ -41,7 +46,7 @@ public class PageLoader extends Thread {
                 }
 
                 updateLinkSet();
-                IndexingUtils.addLemmas(site, linkSet, lemmaMap, indexDataSet);
+                IndexingUtils.addLemmas(site, linkSet);
                 clearLinksDataMap();
             } catch (IOException e) {
                 e.printStackTrace();
@@ -92,7 +97,6 @@ public class PageLoader extends Thread {
      */
     private void clearLinksDataMap() {
         linkSet.clear();
-        lemmaMap.clear();
-        indexDataSet.clear();
+        siteIndexingData.clear();
     }
 }

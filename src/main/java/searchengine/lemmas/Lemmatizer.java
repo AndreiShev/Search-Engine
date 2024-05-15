@@ -1,18 +1,18 @@
 package searchengine.lemmas;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.lucene.morphology.LuceneMorphology;
 import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
 import org.jsoup.Jsoup;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.stereotype.Component;
 import searchengine.model.*;
-import searchengine.parser.PageLoaderInfo;
+import searchengine.parserData.PageLoaderInfo;
+import searchengine.parserData.SiteIndexingData;
 import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
-import searchengine.repository.SiteRepository;
 import searchengine.utils.IndexingUtils;
 
 import java.io.IOException;
@@ -24,22 +24,20 @@ import static searchengine.utils.IndexingUtils.changeSiteStatusTime;
 
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class Lemmatizer {
-    private LuceneMorphology luceneMorph = new RussianLuceneMorphology();
-    private LemmaRepository lemmaRepository;
-    private IndexRepository indexRepository;
-    private PageRepository pageRepository;
-    private SiteRepository siteRepository;
+    private LuceneMorphology luceneMorph;
+    private final LemmaRepository lemmaRepository;
+    private final IndexRepository indexRepository;
+    private final PageRepository pageRepository;
+    private final SiteIndexingData siteIndexingData;
 
-
-    public Lemmatizer() throws IOException {}
-
-    @Autowired
-    public Lemmatizer(LemmaRepository lemmaRepository, IndexRepository indexRepository, PageRepository pageRepository, SiteRepository siteRepository) throws IOException {
-        this.lemmaRepository = lemmaRepository;
-        this.indexRepository = indexRepository;
-        this.pageRepository = pageRepository;
-        this.siteRepository = siteRepository;
+    {
+        try {
+            luceneMorph = new RussianLuceneMorphology();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
 
@@ -244,9 +242,7 @@ public class Lemmatizer {
      */
     public void indexBundleOfPages(Site site,
                                    Set<String> linkSet,
-                                   ConcurrentHashMap<String, PageLoaderInfo> pageLoaderInfoMap,
-                                   Map<String, Lemma> lemmaMap,
-                                   Set<String> indexDataSet) throws IOException, InterruptedException {
+                                   ConcurrentHashMap<String, PageLoaderInfo> pageLoaderInfoMap) throws IOException, InterruptedException {
         if (Thread.currentThread().isInterrupted())
             throw new InterruptedException();
 
@@ -254,7 +250,7 @@ public class Lemmatizer {
         List<Page> pageList = setPageList(site, linkSet, pageLoaderInfoMap);
         List<Page> savedPageList = pageRepository.saveAll(pageList);
         changeSiteStatusTime(site.getId());
-        indexSavedPageList(site, savedPageList, lemmaMap, indexDataSet);
+        indexSavedPageList(site, savedPageList);
         log.info("--------------------------------------End saving: " + new Date() + ", count = " + linkSet.size());
     }
 
@@ -264,19 +260,16 @@ public class Lemmatizer {
      *
      * @param site текущий сайт
      * @param lemma сохраняемая лемма
-     * @param lemmaMap список всех лемм на сайте
      * @param page текущая страница
-     * @param indexDataSet список PageId и LemmaId из таблицы Index.
      * @return экземпляр класса Lemma
      */
-    public Lemma checkLemma(Site site, String lemma, Map<String, Lemma> lemmaMap, Page page, Set<String> indexDataSet)
-            throws IncorrectResultSizeDataAccessException, InterruptedException {
+    public Lemma bundleCheckLemma(Site site, String lemma, Page page) throws IncorrectResultSizeDataAccessException, InterruptedException {
         if (Thread.currentThread().isInterrupted())
             throw new InterruptedException();
 
-        Lemma lemmaObj = lemmaMap.get(lemma);
+        Lemma lemmaObj = siteIndexingData.getLemmaMap().get(lemma);
 
-        if (lemmaObj != null && !indexDataSet.contains(page.getId() + "_" + lemmaObj.getId())) {
+        if (lemmaObj != null && !siteIndexingData.getIndexDataSet().contains(page.getId() + "_" + lemmaObj.getId())) {
             lemmaObj.setFrequency(lemmaObj.getFrequency() + 1);
         } else {
             lemmaObj = new Lemma(site, lemma, 1);
@@ -320,13 +313,9 @@ public class Lemmatizer {
      *
      * @param site текущий сайт
      * @param savedPageList список новых страниц для индексации
-     * @param lemmaMap список всех лемм на сайте
-     * @param indexDataSet список PageId и LemmaId из таблицы Index.
      */
     public void indexSavedPageList(Site site,
-                                   List<Page> savedPageList,
-                                   Map<String, Lemma> lemmaMap,
-                                   Set<String> indexDataSet) throws IOException, InterruptedException {
+                                   List<Page> savedPageList) throws IOException, InterruptedException {
         if (Thread.currentThread().isInterrupted())
             throw new InterruptedException();
 
@@ -337,14 +326,14 @@ public class Lemmatizer {
             List<Lemma> savedLemma = new ArrayList<>();
 
             for (String lemma: lemmas.keySet()) {
-                newLemmaList.add(checkLemma(site, lemma, lemmaMap, page, indexDataSet));
+                newLemmaList.add(checkLemma(site, lemma, page));
             }
 
             savedLemma = lemmaRepository.saveAll(newLemmaList);
 
             for (Lemma lemma: savedLemma) {
-                lemmaMap.put(lemma.getLemma(), lemma);
-                indexDataSet.add(page.getId() + "_" + lemma.getId());
+                siteIndexingData.getLemmaMap().put(lemma.getLemma(), lemma);
+                siteIndexingData.getIndexDataSet().add(page.getId() + "_" + lemma.getId());
                 newIndexList.add(createIndex(page, lemma, lemmas.get(lemma.getLemma())));
             }
             indexRepository.saveAll(newIndexList);

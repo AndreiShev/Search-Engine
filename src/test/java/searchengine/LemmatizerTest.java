@@ -19,7 +19,7 @@ public class LemmatizerTest {
 
     @BeforeAll
     private static void initialization() throws IOException {
-        lemmatizer = new Lemmatizer();
+        //lemmatizer = new Lemmatizer();
 
     }
 

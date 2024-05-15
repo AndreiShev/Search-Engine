@@ -1,12 +1,10 @@
-package searchengine.parser;
+package searchengine.parserData;
 
-import lombok.Getter;
-import lombok.Setter;
+import lombok.Data;
 import searchengine.model.Site;
 
 
-@Getter
-@Setter
+@Data
 public class PageLoaderInfo {
     private Site site;
     private String link;

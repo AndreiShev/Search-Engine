@@ -249,10 +249,12 @@ public class SearchServiceImpl implements SearchService {
         List<Float> absoluteRelevanceList = new ArrayList<>(absoluteRelevance.values().stream().toList());
 
         try{
-            float relevanceMax = absoluteRelevanceList.get(absoluteRelevanceList.size()-1);
+            if (absoluteRelevanceList.size() != 0) {
+                float relevanceMax = absoluteRelevanceList.get(absoluteRelevanceList.size()-1);
 
-            for (Page page: finalPageList) {
-                relativeRelevance.put(page, absoluteRelevance.get(page) / relevanceMax);
+                for (Page page: finalPageList) {
+                    relativeRelevance.put(page, absoluteRelevance.get(page) / relevanceMax);
+                }
             }
         } catch (ArrayIndexOutOfBoundsException e) {
             log.error("Query: " + query + ", finalPageList.size = " + finalPageList.size()

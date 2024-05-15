@@ -24,15 +24,12 @@ spring:
 
 indexing-settings:
   sites:
-    - url: https://skillbox.ru
-      name: Skillbox
+#    - url: https://life.ru
+#      name: Life.ru
 
-    - url: https://life.ru
-      name: Life.ru
-
-    - url: https://ipfran.ru
-      name: ИПФ РАН
-
+#    - url: https://ipfran.ru
+#      name: ИПФ РАН
+#
     - url: https://dombulgakova.ru
       name: Булгаковский дом
 

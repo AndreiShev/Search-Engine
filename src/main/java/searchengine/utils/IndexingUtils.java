@@ -13,7 +13,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import searchengine.config.SitesList;
 import searchengine.lemmas.Lemmatizer;
 import searchengine.model.*;
-import searchengine.parser.PageLoaderInfo;
+import searchengine.parserData.PageLoaderInfo;
 import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
@@ -306,12 +306,12 @@ public class IndexingUtils {
      * @param site текущий сайт
      * @param linkSet список страниц для индексации
      */
-    public static void addLemmas(Site site, Set<String> linkSet, Map<String, Lemma> lemmaMap, Set<String> indexDataSet) throws IOException, InterruptedException {
+    public static void addLemmas(Site site, Set<String> linkSet) throws IOException, InterruptedException {
         if (Thread.currentThread().isInterrupted()) {
             throw new InterruptedException();
         }
 
-        lemmatizer.indexBundleOfPages(site, linkSet, pageLoaderInfoMap, lemmaMap, indexDataSet);
+        lemmatizer.indexBundleOfPages(site, linkSet, pageLoaderInfoMap);
         for (String item: linkSet) {
             pageLoaderInfoMap.remove(item);
         }

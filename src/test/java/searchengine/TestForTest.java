@@ -87,9 +87,9 @@ public class TestForTest {
                     List<Index> newIndexList = new ArrayList<>();
                     List<Lemma> savedLemma = new ArrayList<>();
 
-                    for (String lemma: lemmas.keySet()) {
-                        newLemmaList.add(lemmatizer.checkLemma(site, lemma, lemmaMap, page, indexDataSet));
-                    }
+//                    for (String lemma: lemmas.keySet()) {
+//                        newLemmaList.add(lemmatizer.checkLemma(site, lemma, lemmaMap, page, indexDataSet));
+//                    }
 
                     savedLemma = lemmaRepository.saveAll(newLemmaList);
 

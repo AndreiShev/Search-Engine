@@ -1,5 +1,6 @@
 package searchengine.parser;
 
+import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.util.UriComponents;
@@ -8,6 +9,8 @@ import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.model.Lemma;
 import searchengine.model.SiteStatus;
+import searchengine.parserData.PageLoaderInfo;
+import searchengine.parserData.SiteIndexingData;
 import searchengine.utils.IndexingUtils;
 
 import java.util.*;
@@ -20,6 +23,7 @@ import static searchengine.utils.IndexingUtils.updateMapBaseLinks;
 
 @Setter
 @Slf4j
+@RequiredArgsConstructor
 public class ParserWrapper extends Thread {
     private SitesList sitesList;
     private searchengine.model.Site currentSite;
@@ -37,8 +41,6 @@ public class ParserWrapper extends Thread {
     public static volatile int divider = 0;
     public static volatile int parserSleepTime = 400;
     public static final int minWaitingTime = 200;
-    public static Map<String, Lemma> lemmaMap = new HashMap<>();
-    public static Set<String> indexDataSet = new HashSet<>();
 
     /**
      * Метод запускает скрапинг сайтов по очереди. Сайты берутся из конфига. Если время обработки сайта превышает лимит,
