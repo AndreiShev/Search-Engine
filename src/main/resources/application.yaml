@@ -36,3 +36,7 @@ indexing-settings:
     - url: http://www.playback.ru
       name: Playback.ru
 webinterface: /admin
+
+search-settings:
+  wordRankLimit: 2000
+  snippetInterval: 100

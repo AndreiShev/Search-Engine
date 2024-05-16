@@ -1,18 +1,20 @@
 package searchengine.services.impl;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.jsoup.Jsoup;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
+import searchengine.config.SearchConfig;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.dto.FalseResponse;
 import searchengine.dto.search.SearchDto;
+import searchengine.dto.search.SearchRequest;
 import searchengine.dto.search.SearchResponse;
 import searchengine.lemmas.Lemmatizer;
 import searchengine.model.Index;
@@ -20,11 +22,9 @@ import searchengine.model.Lemma;
 import searchengine.model.Page;
 import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
-import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 import searchengine.services.SearchService;
 
-import java.io.IOException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -32,67 +32,72 @@ import java.util.stream.Collectors;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class SearchServiceImpl implements SearchService {
     private final SiteRepository siteRepository;
-    private final PageRepository pageRepository;
     private final LemmaRepository lemmaRepository;
     private final IndexRepository indexRepository;
     private final Lemmatizer lemmatizer;
-    private SitesList siteList;
-    private final int wordRankLimit = 2000;
-    private final int snippetInterval = 110;
+    private final SitesList siteList;
+    private final SearchConfig searchConfig;
     private List<Page> finalPageList;
     private HashMap<Page, Float> absoluteRelevance = new HashMap<>();
     private HashMap<Page, Float> relativeRelevance = new HashMap<>();
     private HashMap<Lemma, Integer> sortedLemmas = new HashMap<>();
     private HashMap<String, String> ratioLemmasAndQuery = new HashMap<>();
-    private String query;
-    private String site;
-    private int offset;
-    private int limit;
     private List<SearchDto> searchDtoList = new ArrayList<>();
+    private SearchRequest searchRequest;
 
-    @Autowired
-    public SearchServiceImpl(LemmaRepository lemmaRepository, IndexRepository indexRepository,
-                             PageRepository pageRepository, SiteRepository siteRepository,
-                             Lemmatizer lemmatizer, SitesList sitesList) throws IOException {
-        this.lemmaRepository = lemmaRepository;
-        this.indexRepository = indexRepository;
-        this.pageRepository = pageRepository;
-        this.siteRepository = siteRepository;
-        this.lemmatizer = lemmatizer;
-        this.siteList = sitesList;
-    }
+    private HashMap<String, Set<Lemma>> siteLemmas = new HashMap<>();
 
     /**
      * Метод обертка для siteSearch() необходимый для поиска не только по одному сайту
      *
      * @return список результатов поиска, преобразованных в SearchDto
      */
+
     @Override
-    public ResponseEntity performSearch() {
-        if (query.isBlank()) {
+    public ResponseEntity performSearch(SearchRequest searchRequest) {
+        if (searchRequest.getQuery().isBlank()) {
             return new ResponseEntity<>(new FalseResponse(false, "Задан пустой поисковый запрос"),
                     HttpStatus.BAD_REQUEST);
         }
 
-        searchDtoList.clear();
-
-        try {
-            if (site == null) {
-                for (Site siteItem: siteList.getSites()) {
-                    siteSearch(siteItem.getUrl());
-                }
-            } else {
-                siteSearch(site);
-            }
-        } catch (IOException | InterruptedException e) {
-            return new ResponseEntity<>(new FalseResponse(false, "Задан пустой поисковый запрос"),
-                    HttpStatus.BAD_REQUEST);
+        if (!newSearch(searchRequest)) {
+            this.searchRequest = searchRequest;
+            return new ResponseEntity<>(new SearchResponse(true, searchDtoList.size(), getResultList()), HttpStatus.OK);
         }
 
-        return new ResponseEntity<>(new SearchResponse(true, searchDtoList.size(), searchDtoList),
+        resettingClassData();
+        this.searchRequest = searchRequest;
+        pageSearch();
+        getAbsoluteRelevance();
+        getRelativeRelevance();
+        setSearchData();
+
+        return new ResponseEntity<>(new SearchResponse(true, searchDtoList.size(), getResultList()),
                     HttpStatus.OK);
+    }
+
+    private boolean newSearch(SearchRequest searchRequest) {
+        if (this.searchRequest != null
+                && searchRequest.getQuery().equals(this.searchRequest.getQuery())
+                && (searchRequest.getSite() == null && this.searchRequest.getSite() == null
+                || searchRequest.getSite().equals(this.searchRequest.getSite()))) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private void pageSearch() {
+        if (searchRequest.getSite() == null) {
+            for (Site siteItem: siteList.getSites()) {
+                searchForPagesOnSite(siteItem.getUrl());
+            }
+        } else {
+            searchForPagesOnSite(searchRequest.getSite());
+        }
     }
 
     /**
@@ -101,9 +106,9 @@ public class SearchServiceImpl implements SearchService {
      * @param site url сайта, по которому будет осуществляться поиск
      */
     @Override
-    public void siteSearch(String site) throws IOException, InterruptedException {
+    public void searchForPagesOnSite(String site) {
         searchengine.model.Site currentSite = siteRepository.findByUrl(site);
-        HashMap<String, Integer> stringLemmasMap = lemmatizer.getLemmas(query);
+        HashMap<String, Integer> stringLemmasMap = lemmatizer.getLemmas(searchRequest.getQuery());
 
         if (stringLemmasMap.size() == 0) {
             return;
@@ -115,11 +120,10 @@ public class SearchServiceImpl implements SearchService {
             return;
         }
 
-        ratioLemmasAndQuery = lemmatizer.getRatioLemmasAndQuery(query, selectedLemmas);
+        ratioLemmasAndQuery = lemmatizer.getRatioLemmasAndQuery(searchRequest.getQuery(), selectedLemmas);
         sortedLemmas = sortLemmas(selectedLemmas);
-        setFinalPageList(sortedLemmas);
-        setSearchData();
-        resettingClassData();
+        siteLemmas.put(site, selectedLemmas.keySet());
+        addPagesToFinalPageList(sortedLemmas);
     }
 
     private @NotNull HashMap<Lemma, Integer> selectLemmasFromDB(@NotNull Set<String> lemmas, searchengine.model.Site site) {
@@ -144,7 +148,7 @@ public class SearchServiceImpl implements SearchService {
 
         searchengine.model.Site siteModel = siteRepository.findByUrl(site);
         Lemma lemma = lemmaRepository.findByLemmaAndSiteId(lemmaItem, siteModel);
-        if (lemma != null && lemma.getFrequency() < wordRankLimit) {
+        if (lemma != null && lemma.getFrequency() < searchConfig.getWordRankLimit()) {
             result.put(lemma, lemma.getFrequency());
         }
 
@@ -159,7 +163,7 @@ public class SearchServiceImpl implements SearchService {
      * @param sortedLemmas отсортированные в порядке возрастания встречаемости на сайте леммы
      * @return заполняется переменная класса finalPageList
      */
-    private void setFinalPageList(@NotNull HashMap<Lemma, Integer> sortedLemmas) {
+    private void addPagesToFinalPageList(@NotNull HashMap<Lemma, Integer> sortedLemmas) {
         Lemma[] lemmaArray = sortedLemmas.keySet().toArray(new Lemma[sortedLemmas.size()]);
         List<Page> tempPageList = new ArrayList<>();
         List<Index> indexList = indexRepository.findByLemmaId(lemmaArray[0]);
@@ -169,7 +173,12 @@ public class SearchServiceImpl implements SearchService {
         }
 
         if (lemmaArray.length == 1) {
-            finalPageList = tempPageList;
+            if (finalPageList == null || finalPageList.size() == 0) {
+                finalPageList = tempPageList;
+            } else {
+                finalPageList.addAll(tempPageList);
+            }
+
             return;
         }
 
@@ -184,19 +193,23 @@ public class SearchServiceImpl implements SearchService {
      * @return заполняется переменная класса finalPageList
      */
     private void setListPages(Lemma[] lemmaArray, @NotNull List<Page> pageList) {
-        List<Page> tempListPage = new ArrayList<>();
+        List<Page> tempPageList = new ArrayList<>();
 
         for (Page item: pageList) {
             Index index = indexRepository.findByPageIdAndLemmaId(item, lemmaArray[1]);
             if (index != null) {
-                tempListPage.add(index.getPageId());
+                tempPageList.add(index.getPageId());
             }
         }
 
         if (lemmaArray.length == 2) {
-            finalPageList = tempListPage;
+            if (finalPageList == null || finalPageList.size() == 0) {
+                finalPageList = tempPageList;
+            } else {
+                finalPageList.addAll(tempPageList);
+            }
         } else {
-            setListPages(Arrays.copyOfRange(lemmaArray, 1, lemmaArray.length), tempListPage);
+            setListPages(Arrays.copyOfRange(lemmaArray, 1, lemmaArray.length), tempPageList);
         }
     }
 
@@ -206,9 +219,7 @@ public class SearchServiceImpl implements SearchService {
      * @return список моделей searchDto
      */
     private List<SearchDto> setSearchData() {
-        getAbsoluteRelevance();
-        getRelativeRelevance();
-
+        searchDtoList = new ArrayList<>();
         for (Page item: finalPageList) {
             JSONArray snippets = getSnippets(item);
             if (snippets.length() == 0) {
@@ -231,7 +242,9 @@ public class SearchServiceImpl implements SearchService {
 
     private void getAbsoluteRelevance() {
         for (Page page: finalPageList) {
-            for (Lemma lemma: sortedLemmas.keySet()) {
+            Set<Lemma> lemmas = siteLemmas.get(page.getSiteId().getUrl());
+
+            for (Lemma lemma: lemmas) {
                Index index = indexRepository.findByPageIdAndLemmaId(page, lemma);
 
                if (absoluteRelevance.containsKey(page)) {
@@ -257,7 +270,7 @@ public class SearchServiceImpl implements SearchService {
                 }
             }
         } catch (ArrayIndexOutOfBoundsException e) {
-            log.error("Query: " + query + ", finalPageList.size = " + finalPageList.size()
+            log.error("Query: " + searchRequest.getQuery() + ", finalPageList.size = " + finalPageList.size()
                     + ", absoluteRelevance.size = : " + absoluteRelevance.size()
                     + ", relativeRelevance.size: " + relativeRelevance.size());
         }
@@ -362,10 +375,10 @@ public class SearchServiceImpl implements SearchService {
         while (match.find()) {
             content = new StringBuilder(content).insert(match.end() +count, "</b>").toString();
             content = new StringBuilder(content).insert(match.start()+count, "<b>").toString();
-            int firstIndex = (match.start() +count) < snippetInterval ? 0 : (match.start() + count) - snippetInterval;
+            int firstIndex = (match.start() +count) < searchConfig.getSnippetInterval() ? 0 : (match.start() + count) - searchConfig.getSnippetInterval();
             count +=numberHighlightCharacters;
-            int lastIndex = ((match.end()+count) > content.length() - snippetInterval) ?
-                    content.length() : (match.end()+count) + snippetInterval;
+            int lastIndex = ((match.end()+count) > content.length() - searchConfig.getSnippetInterval()) ?
+                    content.length() : (match.end()+count) + searchConfig.getSnippetInterval();
 
             resultList.add(content.substring(firstIndex, lastIndex));
 
@@ -385,30 +398,22 @@ public class SearchServiceImpl implements SearchService {
         return jsonArray;
     }
 
-    private void resettingClassData() {
-        sortedLemmas.clear();
-        finalPageList.clear();
-        absoluteRelevance.clear();
-        relativeRelevance.clear();
+    private List<SearchDto> getResultList() {
+        int start = searchRequest.getOffset() == 0 ? 0 : searchRequest.getLimit() * (searchRequest.getOffset()+1);
+        int end = start + searchRequest.getLimit() > searchDtoList.size() ? searchDtoList.size() : start + searchRequest.getLimit();
+        List<SearchDto> copyList = new ArrayList<>(searchDtoList.subList(start, end));
+        return copyList;
     }
 
-
-    @Override
-    public void setQuery(String query) {
-        this.query = query;
-    };
-
-    @Override
-    public void setSite(String site) {
-        this.site = site;
-    };
-    @Override
-    public void setOffset(int offset) {
-        this.offset = offset;
-    };
-
-    @Override
-    public void setLimit(int limit) {
-        this.limit = limit;
-    };
+    private void resettingClassData() {
+        try {
+            searchDtoList.clear();
+            sortedLemmas.clear();
+            finalPageList.clear();
+            absoluteRelevance.clear();
+            relativeRelevance.clear();
+        } catch (NullPointerException ex) {
+            log.info("Очищаемые поля SearchServiceImpl пусты.");
+        }
+    }
 }

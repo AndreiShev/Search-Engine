@@ -1551,7 +1551,7 @@ var API = function(){
                     });
                     $(window).scrollTop(scroll);
                     $searchResults.addClass('SearchResult_ACTIVE');
-                    if (result.count > data.offset + result.data.length) {
+                    if (result.count > (data.offset+1) * result.data.length) {
                         $('.SearchResult-footer').removeClass('SearchResult-footer_hide')
                         $('.SearchResult-footer button[data-send="search"]')
                             .data('sendoffset', data.offset + result.data.length)
@@ -1744,12 +1744,16 @@ var API = function(){
                             break;
                         case 'search':
                             if ($this.data('sendtype')==='next') {
+                                var searchForm = $('#' + 'search-form');
+                                searchForm.data('offset', searchForm.data('offset')+1);
                                 data = {
-                                    site: $this.data('searchsite'),
-                                    query: $this.data('searchquery'),
-                                    offset: $this.data('sendoffset'),
-                                    limit: $this.data('sendlimit')
+                                    query: searchForm.find('[name="query"]').val(),
+                                    offset: searchForm.data('offset'),
+                                    limit: searchForm.data('sendlimit')
                                 };
+                                if ( searchForm.find('[name="site"]').val() ) {
+                                    data.site = searchForm.find('[name="site"]').val();
+                                }
                             } else {
                                 data = {
                                     query: $this.find('[name="query"]').val(),

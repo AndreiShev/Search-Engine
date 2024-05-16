@@ -1,5 +1,6 @@
 package searchengine.services.impl;
 
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import searchengine.config.Site;
@@ -17,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class StatisticsServiceImpl implements StatisticsService {
     private final SitesList sites;
     private final SiteRepository siteRepository;
@@ -24,14 +26,6 @@ public class StatisticsServiceImpl implements StatisticsService {
     private final LemmaRepository lemmaRepository;
     private TotalStatistics total = new TotalStatistics();
     List<DetailedStatisticsItem> detailed = new ArrayList<>();
-
-    @Autowired
-    public StatisticsServiceImpl(SitesList sites, SiteRepository siteRepository, PageRepository pageRepository, LemmaRepository lemmaRepository) {
-        this.sites = sites;
-        this.siteRepository = siteRepository;
-        this.pageRepository = pageRepository;
-        this.lemmaRepository = lemmaRepository;
-    }
 
     /**
      * Метод собирает статистику количества сохраненных страниц и лемм на всех сайтах

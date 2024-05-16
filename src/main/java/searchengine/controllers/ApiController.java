@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.*;
+import searchengine.dto.search.SearchRequest;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.services.IndexingService;
 import searchengine.services.SearchService;
@@ -50,12 +51,8 @@ public class ApiController {
                                  @Nullable @RequestParam String site,
                                  @RequestParam int offset,
                                  @RequestParam int limit) {
-        searchService.setQuery(query);
-        searchService.setSite(site);
-        searchService.setOffset(offset);
-        searchService.setLimit(limit);
-
-        ResponseEntity responseEntity = searchService.performSearch();
+        SearchRequest searchRequest = new SearchRequest(query, site, Integer.valueOf(offset), Integer.valueOf(limit));
+        ResponseEntity responseEntity = searchService.performSearch(searchRequest);
         return responseEntity;
     }
 }

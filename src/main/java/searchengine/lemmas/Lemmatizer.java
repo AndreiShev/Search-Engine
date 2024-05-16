@@ -3,7 +3,6 @@ package searchengine.lemmas;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.lucene.morphology.LuceneMorphology;
-import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
 import org.jsoup.Jsoup;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.stereotype.Component;
@@ -13,7 +12,6 @@ import searchengine.parserData.SiteIndexingData;
 import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
-import searchengine.utils.IndexingUtils;
 
 import java.io.IOException;
 import java.util.*;
@@ -26,20 +24,11 @@ import static searchengine.utils.IndexingUtils.changeSiteStatusTime;
 @Slf4j
 @RequiredArgsConstructor
 public class Lemmatizer {
-    private LuceneMorphology luceneMorph;
+    private final LuceneMorphology luceneMorph;
     private final LemmaRepository lemmaRepository;
     private final IndexRepository indexRepository;
     private final PageRepository pageRepository;
     private final SiteIndexingData siteIndexingData;
-
-    {
-        try {
-            luceneMorph = new RussianLuceneMorphology();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
 
     /**
      * Метод разделяет текст на слова, находит все леммы и считает их количество.
@@ -47,7 +36,7 @@ public class Lemmatizer {
      * @param text текст из которого будут выбираться леммы
      * @return ключ является леммой, а значение количеством найденных лемм
      */
-    public HashMap<String, Integer> getLemmas(String text) throws IOException {
+    public HashMap<String, Integer> getLemmas(String text) {
         try {
             HashMap<String, Integer> result = new HashMap<>();
 
@@ -86,38 +75,32 @@ public class Lemmatizer {
      * @param page страница, по которой выполняется поиск и сохраннение лемм
      * @return true в случае успешного добавления, в противном случае false
      */
-    public boolean addLemmas(String html, Site site, Page page) throws IOException, InterruptedException {
+    public boolean addLemmas(String html, Site site, Page page) throws InterruptedException {
         if (Thread.currentThread().isInterrupted())
             throw new InterruptedException();
 
-        try {
-            HashMap<String, Integer> lemmas = getLemmas(clearHTML(html));
-            List<Lemma> lemmaList = new ArrayList<>();
-            List<Index> indexList = new ArrayList<>();
-            List<Lemma> savedLemma = new ArrayList<>();
+        HashMap<String, Integer> lemmas = getLemmas(clearHTML(html));
+        List<Lemma> lemmaList = new ArrayList<>();
+        List<Index> indexList = new ArrayList<>();
+        List<Lemma> savedLemma = new ArrayList<>();
 
-            for (String item: lemmas.keySet()) {
-                if (Thread.currentThread().isInterrupted())
-                    throw new InterruptedException();
+        for (String item: lemmas.keySet()) {
+            if (Thread.currentThread().isInterrupted())
+                throw new InterruptedException();
 
-                lemmaList.add(checkLemma(site, item, page));
-            }
-
-            savedLemma = lemmaRepository.saveAll(lemmaList);
-
-            for (Lemma lemma: savedLemma) {
-                if (Thread.currentThread().isInterrupted())
-                    throw new InterruptedException();
-                indexList.add(createIndex(page, lemma, lemmas.get(lemma.getLemma())));
-            }
-
-            indexRepository.saveAll(indexList);
-            return true;
-        } catch (IOException e) {
-            log.error("Lemmatizer.addLemmas Info: " + e.getMessage());
-            IndexingUtils.changeSiteStatus(site.getName(), SiteStatus.FAILED, e.getMessage());
-            return false;
+            lemmaList.add(checkLemma(site, item, page));
         }
+
+        savedLemma = lemmaRepository.saveAll(lemmaList);
+
+        for (Lemma lemma: savedLemma) {
+            if (Thread.currentThread().isInterrupted())
+                throw new InterruptedException();
+            indexList.add(createIndex(page, lemma, lemmas.get(lemma.getLemma())));
+        }
+
+        indexRepository.saveAll(indexList);
+        return true;
     }
 
     /**
@@ -206,10 +189,7 @@ public class Lemmatizer {
         return new Index(page, lemma, wordRank);
     }
 
-    public HashMap<String, String> getRatioLemmasAndQuery(String query, HashMap<Lemma, Integer> selectedLemmas)
-            throws IOException, InterruptedException {
-        if (Thread.currentThread().isInterrupted())
-            throw new InterruptedException();
+    public HashMap<String, String> getRatioLemmasAndQuery(String query, HashMap<Lemma, Integer> selectedLemmas) {
 
         List<String> listWords = getListWords(query);
         HashMap<String, String> result = new HashMap<>();
@@ -226,7 +206,6 @@ public class Lemmatizer {
                     result.put(firstFormWord, item);
                 }
             }
-
         }
 
         return result;

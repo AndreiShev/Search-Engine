@@ -31,7 +31,7 @@
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
 
     <script>var backendApiUrl = 'api'</script>
-    <script defer src="/assets/js/scripts.js?v=38874865"></script>
+    <script defer src="/assets/js/scripts.js"></script>
     <script defer src="/assets/js/my.js"></script>
 </head>
 <body class="Site">
@@ -136,7 +136,7 @@ p.error-browser
                                 <h2 class="Section-title" th:text="#{section.title.search}">Search
                                 </h2>
                             </div>
-                            <form class="form form_close" action="#" method="post" data-send="search" data-sendlimit="10">
+                            <form class="form form_close" id="search-form" action="#" method="post" data-send="search" data-sendlimit="10" data-offset="0">
                                 <div class="form-group">
                                     <div class="form-selectWrap">
                                         <!-- - var options = setOptions(items, ['value', 'selected', 'disabled']);-->
